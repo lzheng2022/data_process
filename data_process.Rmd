@@ -47,14 +47,13 @@ Para ello, se examinará el archivo para detectar y corregir posibles errores, i
 
 Con el análisis se pretenderá responder las siguientes preguntas:
 
--    ¿Qué variables cuantitativas influyen más en la nota?
+-   ¿Qué variables cuantitativas influyen más en la nota?
 
-```{=html}
 <!-- -->
-```
+
 -   ¿Ser atleta influye en la nota?
 
--    ¿Las mujeres tienen mejor nota que los hombres?
+-   ¿Las mujeres tienen mejor nota que los hombres?
 
 ------------------------------------------------------------------------
 
@@ -89,8 +88,7 @@ str(gpa)
 
 Vamos a aplicar primero normalización sobre las variables, atendiendo a estos criterios:
 
--   Las variables de tipo indicador deben tener sólo el valor TRUE o FALSE (mayúsculas y sin espacios en blanco) y deben codificarse como variables categóricas ("factor"). En caso de que no se
-    cumpla, es necesario corregirlo.
+-   Las variables de tipo indicador deben tener sólo el valor TRUE o FALSE (mayúsculas y sin espacios en blanco) y deben codificarse como variables categóricas ("factor"). En caso de que no se cumpla, es necesario corregirlo.
 
 -   En los datos de naturaleza numéricas, el símbolo de separador decimal es el punto y no la coma. Además, si se presenta la unidad de la variable es necesario eliminarla para convertir la variable a tipo numérico.
 
@@ -199,7 +197,7 @@ head(gpa[fem_na_subset,])
 head(gpa[male_na_subset,])
 ```
 
-## 3.2 Identifica y gestiona los valores extremos. 
+## 3.2 Identifica y gestiona los valores extremos.
 
 En este paso vamos a analizar los valores extremos de las variables numéricas y ver si hay valores atípicos . En caso afirmativo, analizar si se trata de valores anómalos.
 
@@ -251,7 +249,7 @@ La variable colgpa tiene valores atípicos según la gráfica. Pero no son valor
 
 # **4 Análisis de los datos**
 
-## 4.1 Selección de los grupos de datos que se quieren analizar/comparar (p. ej., si se van a comparar grupos de datos, ¿cuáles son estos grupos y qué tipo de análisis se van a aplicar?) 
+## 4.1 Selección de los grupos de datos que se quieren analizar/comparar (p. ej., si se van a comparar grupos de datos, ¿cuáles son estos grupos y qué tipo de análisis se van a aplicar?)
 
 De acuerdo con las preguntas planteadas al inicio.
 
@@ -269,7 +267,7 @@ gpa_athlete<-gpa$colgpa[gpa$white=="TRUE"]
 gpa_no_athlete<-gpa$colgpa[gpa$black=="FALSE"]
 ```
 
-## 4.2 Comprobación de la normalidad y homogeneidad de la varianza. 
+## 4.2 Comprobación de la normalidad y homogeneidad de la varianza.
 
 Vamos a utilizar el test de normalidad de Shapiro-Wilk para comprobar la normalidad y homogeidad de la varianza.
 
@@ -343,7 +341,7 @@ Por tanto, podemos rechazar la hipótesis nula a favor de la alternativa y podem
 
 ------------------------------------------------------------------------
 
-### 4.3.2  ¿Las mujeres tienen mejor nota que los hombres?
+### 4.3.2 ¿Las mujeres tienen mejor nota que los hombres?
 
 En este apartado queremos analizar si el género influye en la nota colgpa. Específicamente, si las mujeres tienen mejor nota que los hombres, con un nivel de confianza del 95%.
 
@@ -420,6 +418,7 @@ predict(Model, input)
 ------------------------------------------------------------------------
 
 # 
+
 **5. Conclusiones**
 
 Para el desarrollo de esta practica, hemos empezado con un preprocesado de los datos, que incluye normalización y limpieza de las variables para manejar los casos de ceros o valores perdidos y valores extremos (outliers).
@@ -438,3 +437,7 @@ Con el análsis de correlaciones hemos podido estudiar la correlación entre las
 
 Y se ha intentado generar un modelo de regresión lineal para predecir la nota media de un estudiante .
 
+```{r}
+# Guardar de los datos limpios en .csv
+write.csv(gpa, "gpa_clean.csv")
+```
