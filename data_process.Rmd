@@ -1,0 +1,440 @@
+---
+title: "PRA2 - Tipología y ciclo de vida de los datos"
+author: "Lingfeng Zheng"
+output:
+  pdf_document:
+    toc: yes
+    toc_depth: '2'
+  html_document:
+    highlight: default
+    number_sections: yes
+    theme: cosmo
+    toc: yes
+    toc_depth: 2
+---
+
+# **1. Descripción del dataset**
+
+Se ha elegido el siguiente conjunto de datos: gpa_row.csv. Por se un conjunto de datos que contiene una amplia variedad de datos numéricos y categóricos para poder realizar un análisis rico y sacar conclusiones a una serie de preguntas.
+
+Este es un dataset que contiene la nota media de estudiantes universitarios después del primer semestre de clases (GPA: grade point average, en inglés), así como información sobre la nota de acceso, la cohorte de graduación en el instituto y algunas características de los estudiantes.
+
+Las variables incluidas en el conjunto de datos son:
+
+• sat: nota de acceso (medida en escala de 400 a 1600 puntos)
+
+• tothrs: horas totales cursadas en el semestre
+
+• hsize: numero total de estudiantes en la cohorte de graduados del bachillerato (en cientos)
+
+• hsrank: ranking del estudiante, dado por la nota media del bachillerato, en su cohorte de graduados del bachillerato
+
+• hsperc: ranking relativo del estudiante (hsrank/hsize).
+
+• colgpa: nota media del estudiante al final del primer semestre (medida en escala de 0 a 4 puntos)
+
+• athlete: indicador de si el estudiante practica algún deporte en la universidad
+
+• female: indicador de si el estudiante es mujer
+
+• white: indicador de si el estudiante es de raza blanca o no
+
+• black: indicador de si el estudiante es de raza negra o no
+
+El objetivo de esta actividad es preparar el conjunto de datos pasando por las diferentes etapas de tratamiento de datos, para dejar un conjunto de datos listo para su posterior análisis.
+
+Para ello, se examinará el archivo para detectar y corregir posibles errores, inconsistencias y valores perdidos. Además se presentará una breve estadística descriptiva con gráficos.
+
+Con el análisis se pretenderá responder las siguientes preguntas:
+
+-    ¿Qué variables cuantitativas influyen más en la nota?
+
+```{=html}
+<!-- -->
+```
+-   ¿Ser atleta influye en la nota?
+
+-    ¿Las mujeres tienen mejor nota que los hombres?
+
+------------------------------------------------------------------------
+
+# 2. Integración y selección
+
+De las variables presentadas anteriormente se procede a eliminar la variable hsperc, al ser esta una variable derivada que se calcula a partir de las otras dos presentes en el mismo dataset.
+
+Como en el desarrollo de esta practica hay una parte que trata sobre la creación de un modelo para el análisis de regresión, tener más variables a la hora de crear un modelo no siempre conlleva a tener un modelo mejor, sino que puede generar ruidos y empeorar el modelo. Especialmente en este caso, que se trata de una variable derivada de otras dos presentes en el conjunto de datos.
+
+Por lo que se procede a eliminar este variable.
+
+Primero se procede a la lectura del conjunto de datos:
+
+```{r}
+gpa_raw <-read.csv("gpa_row.csv" ,sep=",", stringsAsFactors=TRUE)
+gpa <- gpa_raw[,-5]
+```
+
+------------------------------------------------------------------------
+
+# **3. Limpieza de los datos**
+
+```{r}
+# Isnpeccionamos la dimensión del dataset
+dim(gpa)
+```
+
+```{r}
+# Vemos cómo ha interpretado cada columna al cargar el csv
+str(gpa)
+```
+
+Vamos a aplicar primero normalización sobre las variables, atendiendo a estos criterios:
+
+-   Las variables de tipo indicador deben tener sólo el valor TRUE o FALSE (mayúsculas y sin espacios en blanco) y deben codificarse como variables categóricas ("factor"). En caso de que no se
+    cumpla, es necesario corregirlo.
+
+-   En los datos de naturaleza numéricas, el símbolo de separador decimal es el punto y no la coma. Además, si se presenta la unidad de la variable es necesario eliminarla para convertir la variable a tipo numérico.
+
+```{r}
+#aplicamos toupper para trasnformarlos todos a mayúscula
+gpa$athlete <- toupper(gpa$athlete)
+#lo transformamos de nuevo al tipo factor
+gpa$athlete <- as.factor(gpa$athlete)
+```
+
+```{r}
+#lo transformamos a tipo factor
+gpa$female <- as.factor(gpa$female)
+```
+
+```{r}
+#aplicamos toupper y trimws, y lo transformamos a factor de nuevo
+gpa$black <- trimws(toupper(gpa$black))
+gpa$black <- as.factor(gpa$black)
+```
+
+```{r}
+gpa$white <- trimws(toupper(gpa$white))
+gpa$white <- as.factor(gpa$white)
+```
+
+```{r}
+gpa$sat <- as.numeric(gpa$sat)
+```
+
+```{r warning=FALSE}
+#convertir tipo facotr a caracter
+hours <- as.character(gpa$tothrs)
+#aplicar word que devuelve el primer caracter y con h como separador, para sacar la parte numerica
+library(stringr)
+val <- word(hours,sep=fixed("h"))
+# convertir en integer
+gpa$tothrs <- as.numeric(gpa$tothrs)
+```
+
+```{r}
+#aplicar cambio de coma por punto y comprobar que no hay más valores coma decimal
+gpa$hsize <- gsub("\\,","\\.",gpa$hsize)
+coma_sep <- grep("\\,", gpa$hsize)
+coma_sep
+```
+
+```{r}
+#transformar a tipo numeric y redondear a 2 unidad decimal como pide el enunciado
+gpa$hsize <- as.numeric(gpa$hsize)
+gpa$hsize <- round(gpa$hsize, digits = 2)
+```
+
+```{r}
+# Comprobamos el resultado tras aplicar la normalización
+str(gpa)
+```
+
+## 3.1 ¿Los datos contienen ceros o elementos vacíos? Gestiona cada uno de estos casos.
+
+Primero comprobamos que columnas contiene valores perdidos:
+
+```{r}
+names(which(colSums(is.na(gpa))>0))
+```
+
+Vemos que hay valores perdidos para la variable colgpa, vamos a proceder a imputar estos valores perdidos aplicando la tecnica de imputación por vecinos más cercanos, utilizando la distancia de Gower, considerando en el cómputo de los vecinos más cercanos el resto de variables cuantitativas.
+
+Además, para tener mayor calidad a la hora de aplicar la imputación, se realizará de forma que la imputación se realizará con registros del mismo género. Es decir, si un registro a imputar es mujer, se debe realizar la imputación usando sólo las variables cuantitativas de los registros de mujeres.
+
+Para ello, usaremos la función KNN:
+
+```{r warning=FALSE}
+library("dplyr")
+library("VIM")
+```
+
+```{r}
+gpa_fem_imput <- kNN( filter(gpa,female=="TRUE"), variable= "colgpa", k= 11)
+gpa_male_imput <- kNN( filter(gpa,female=="FALSE"), variable= "colgpa", k= 11)
+fem_na_subset <- which(gpa$female=="TRUE" & is.na(gpa$colgpa))
+male_na_subset <- which(gpa$female=="FALSE" & is.na(gpa$colgpa))
+```
+
+```{r}
+head(gpa[fem_na_subset,])
+```
+
+```{r}
+head(gpa[male_na_subset,])
+```
+
+```{r}
+# Imputar por los valores salida de KNN
+gpa[fem_na_subset,]$colgpa <- gpa_fem_imput[gpa_fem_imput$colgpa_imp==TRUE,]$colgpa
+gpa[male_na_subset,]$colgpa <- gpa_male_imput[gpa_male_imput$colgpa_imp==TRUE,]$colgpa
+```
+
+```{r}
+# Comprobamos que se han imputado correctamente los valores perdidos
+head(gpa[fem_na_subset,])
+```
+
+```{r}
+# Comprobamos que se han imputado correctamente los valores perdidos
+head(gpa[male_na_subset,])
+```
+
+## 3.2 Identifica y gestiona los valores extremos. 
+
+En este paso vamos a analizar los valores extremos de las variables numéricas y ver si hay valores atípicos . En caso afirmativo, analizar si se trata de valores anómalos.
+
+En caso de que hay presente valores anómalos, el procedimiento sería de sustituir estos por NA y aplicar un metodo de imputación para esos valores.
+
+Los valores extremos son aquellos que presentan valores no congruentes comparados con el resto de los datos, por ejemplo los valores que aparecen en los extremos del rango intercuartílico.
+
+Para ello, vamos a usar las gráficas de caja para analizar los valores atípicos.
+
+Los valores atípicos son los que están en los estremos, fuera del límite de 25 percentil o 75 percentil. Representados como circulos blancos en las gráficas de cajas:
+
+```{r}
+boxplot(gpa$sat, main="sat")
+```
+
+```{r}
+summary(gpa$sat)
+```
+
+La variable sat tiene valores atípicos según la gráfica. Pero no valores anómalos, al todos los valores dentro del rango es de 400 a 1600.
+
+```{r}
+boxplot(gpa$tothrs,main="tothrs")
+```
+
+La variable tothr no tiene valores atípicos.
+
+```{r}
+boxplot(gpa$hsize,main="hsize")
+```
+
+```{r}
+summary(gpa$hsize)
+```
+
+La variable hsize tiene valores atípicos, pero tampoco son valores anómalos. Ya que la variable hsize representa el número total de estudiantes en la cohorte (en cientos), de manera que significa que tiene un número de alumnos que va de 3 a 940.
+
+```{r}
+boxplot(gpa$colgpa,main="colgpa")
+```
+
+```{r}
+summary(gpa$colgpa)
+```
+
+La variable colgpa tiene valores atípicos según la gráfica. Pero no son valores anómalos, ya que todos los valores están dentro del rango permitido de 0.0 a 4.0.
+
+------------------------------------------------------------------------
+
+# **4 Análisis de los datos**
+
+## 4.1 Selección de los grupos de datos que se quieren analizar/comparar (p. ej., si se van a comparar grupos de datos, ¿cuáles son estos grupos y qué tipo de análisis se van a aplicar?) 
+
+De acuerdo con las preguntas planteadas al inicio.
+
+Se va a separar en grupos según si es hombre o mujer:
+
+```{r}
+gpa_female<-gpa$colgpa[gpa$female=="TRUE"]
+gpa_male<-gpa$colgpa[gpa$female=="FALSE"]
+```
+
+Según si es atleta o no:
+
+```{r}
+gpa_athlete<-gpa$colgpa[gpa$white=="TRUE"]
+gpa_no_athlete<-gpa$colgpa[gpa$black=="FALSE"]
+```
+
+## 4.2 Comprobación de la normalidad y homogeneidad de la varianza. 
+
+Vamos a utilizar el test de normalidad de Shapiro-Wilk para comprobar la normalidad y homogeidad de la varianza.
+
+El test de normalidad de Shapiro-Wilk trabaja con la hipótesis nula de normalidad de los datos. Para los valores de p del test inferiores al nivel de significancia permiten rechazar la hipótesis nula y, por lo tanto, llevarían a descartar la normalidad de los datos.
+
+```{r}
+alpha = 0.05
+col_names = colnames(gpa)
+for (i in 1:ncol(gpa)) {
+  if (i == 1) cat("Las variables que no siguen una distribución normal son:\n")
+  if (is.integer(gpa[,i]) | is.numeric(gpa[,i])) {
+    p_val = shapiro.test(gpa[,i])$p.value
+    if (p_val < alpha) {
+      cat(col_names[i])
+      # Format output
+      if (i < ncol(gpa) - 1) cat(", ")
+      if (i %% 3 == 0) cat("\n") 
+    } 
+  } 
+}
+```
+
+## 4.3 Aplicación de pruebas estadísticas para comparar los grupos de datos. En función de los datos y el objetivo del estudio, aplicar pruebas de contraste de hipótesis, correlaciones, regresiones, etc. Aplicar al menos tres métodos de análisis diferentes.
+
+### 4.3.1 ¿Ser atleta influye en la nota?
+
+En este apartado queremos analizar si ser atleta influye en la nota colgpa. Es decir, si hay diferencias significativas entre atletas y no atletas en esta nota, con un nivel de confianza del 95%.
+
+#### 4.3.1.1 Análisis visual:
+
+```{r}
+library(ggplot2)
+ggplot(gpa, aes(x=colgpa, color=athlete, fill=athlete)) +
+  geom_histogram( aes(y=..density..), bins = 80,  alpha=0.5)+
+  geom_density( alpha=0.6)
+```
+
+#### **4.3.1.2 Hipótesis nula y la alternativa**
+
+En este caso se trata de una comparación de medias en poblaciones independientes:
+
+H0 : $\mu$~athlete~ = $\mu$~no_athlete~
+
+H1 : $\mu$~athlete~ $\neq$ $\mu$~no_athete~
+
+#### **4.3.1.3 Justificación del test a aplicar**
+
+Necesitamos aplicar el test de dos muestras sobre la media con varianzas desconocidas.
+
+Como en este caso, el número de muestras es mayor que 30, podemos aplicar el teorema del límite central y considerar la aproximación a la distribución normal.
+
+Lo siguiente es comprobar la igualdad o no de varianzas:
+
+```{r}
+ath_true<-gpa$colgpa[gpa$athlete=="TRUE"]
+ath_false<-gpa$colgpa[gpa$athlete=="FALSE"]
+var.test(ath_true,ath_false)
+```
+
+El resultado del var.test anterior nos devuelve un valor de 0.07235 para p, que es mayor que 0.05. Por lo que no podemos rechazar la hipóteis nula de igualdad de varianzas, es decir, tienen misma varianza.
+
+#### **4.3.1.4 Interpretación del test**
+
+```{r}
+t.test(ath_true,ath_false,var.equal=TRUE)
+```
+
+El pvalor del test (3.69 × 10-9) es inferior al nivel de signifificación (0.05). Además el valor observado -5.91 no se encuentra dentro de la zona de aceptación.
+
+Por tanto, podemos rechazar la hipótesis nula a favor de la alternativa y podemos concluir que en promedio la nota media de los alumnos que practican el deporte es diferente de la de los alumos que no practican el deporte.
+
+------------------------------------------------------------------------
+
+### 4.3.2  ¿Las mujeres tienen mejor nota que los hombres?
+
+En este apartado queremos analizar si el género influye en la nota colgpa. Específicamente, si las mujeres tienen mejor nota que los hombres, con un nivel de confianza del 95%.
+
+#### 4.3.2.1 Análisis visual:
+
+```{r}
+library(ggplot2)
+ggplot(gpa, aes(x=colgpa, color=female, fill=female)) +
+  geom_histogram( aes(y=..density..), bins = 80,  alpha=0.5)+
+  geom_density( alpha=0.6)
+```
+
+#### **4.3.2.2 Hipótesis nula y la alternativa**
+
+En este caso se trata de una comparación de medias en poblaciones independientes:
+
+H0 : $\mu$~female~ = $\mu$~male~
+
+H1 : $\mu$~female~ \> $\mu$~male~
+
+#### **4.3.2.3 Justificación del test a aplicar**
+
+Necesitamos aplicar el test de dos muestras sobre la media con varianzas desconocidas.
+
+Como en este caso, el número de muestras es mayor que 30, podemos aplicar el teorema del límite central y considerar la aproximación a la distribución normal.
+
+Lo siguiente es comprobar la igualdad o no de varianzas:
+
+```{r}
+var.test(gpa_female,gpa_male)
+```
+
+El resultado del var.test anterior nos devuelve un valor de 1.804 × 10-5 para p, que es menor que 0.05. Por lo que podemos rechazar la hipóteis nula de igualdad de varianzas, es decir, tienen distinta varianza.
+
+Por último, concluimos que el tipo de test sería un test de dos muestras sobre la media con varianza desconocida y distinta. Y sería un test unilateral por la derecha.
+
+#### **4.3.2.4 Justificación del test a aplicar**
+
+```{r}
+t.test(gpa_female,gpa_male,var.equal=FALSE, alternative = "greater")
+```
+
+El pvalor del test (8.522e× 10-13) es inferior al nivel de significación (0.05). Además el valor observado 7.0787 no se encuentra dentro de la zona de aceptación del hipótesis H~0~. Por tanto, podemos rechazar la hipótesis nula a favor de la alternativa y podemos concluir que en promedio la nota media del semestre de las alumnas son mayor que la de los alumnos.
+
+------------------------------------------------------------------------
+
+### 4.3.3 ¿Qué variables tienen correlación?
+
+```{r}
+round(cor(gpa[,1:5]),2)
+```
+
+Vemos que existe cierta correlación entre la variable hsize y hsrank.
+
+------------------------------------------------------------------------
+
+### 4.4.4 **Modelo de regresión lineal**
+
+```{r}
+# Estimacion del modelo lineal
+Model <- lm(colgpa~sat+hsize+hsrank, data=gpa)
+summary(Model)
+```
+
+El valor del R^2^ es 0.2607, un valor bastante bajo. Lo cual indica que el modelo generado tiene poca calidad.
+
+Prediccion:
+
+```{r}
+input = data.frame(sat = 920,hsize = 67,hsrank = 4)
+predict(Model, input)
+```
+
+------------------------------------------------------------------------
+
+# 
+**5. Conclusiones**
+
+Para el desarrollo de esta practica, hemos empezado con un preprocesado de los datos, que incluye normalización y limpieza de las variables para manejar los casos de ceros o valores perdidos y valores extremos (outliers).
+
+Para el caso de valores perdidos, se ha hecho uso de un método de imputación basado en la distancia de los N vecinos, de tal forma que no tengamos que eliminar registros del conjunto de datos inicial y a la vez nos permite tener datos de cierta calidad al imputarlos de esta forma.
+
+Para el caso de los valores extremos, se ha observado que aunque se tratan de valores atípicos, no son valores anómalos. Por lo que se ha incluido los valores para el análisis.
+
+En un paso posterior, se ha realizado tres tipos de pruebas estadísticas sobre un conjunto de datos que contiene diferentes variables relativas a las notas de los estudiantes universitarios.
+
+Para cada una de ellas, hemos podido ver cuáles son los resultados y conclusiones que llegamos a partir de las pruebas estadísticas realizadas.
+
+El análisis de contraste de hipótesis nos ha permitido responder a las preguntas formuladad inicialmente con una probabilidad de 95%.
+
+Con el análsis de correlaciones hemos podido estudiar la correlación entre las variable.
+
+Y se ha intentado generar un modelo de regresión lineal para predecir la nota media de un estudiante .
+
